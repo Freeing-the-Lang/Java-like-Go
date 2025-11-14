@@ -1,4 +1,4 @@
-name: "Java-like-Go — Stable 3OS Build + ProofLedger"
+name: "Java-like-Go — 3OS Stable Build + ProofLedger"
 
 on:
   push:
@@ -8,21 +8,23 @@ on:
 permissions:
   contents: write
 
-jobs:
 
-  # ============================
-  # LINUX
-  # ============================
+# ============================
+# LINUX JOB
+# ============================
+jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
       - name: Prepare dist
         run: mkdir -p dist
+        shell: bash
 
       - name: Transpile
         run: |
@@ -30,6 +32,7 @@ jobs:
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
+        shell: bash
 
       - name: Build binary
         run: go build -o dist/out dist/out.go
@@ -46,19 +49,21 @@ jobs:
           path: dist/
 
 
-  # ============================
-  # MAC
-  # ============================
+# ============================
+# MACOS JOB
+# ============================
   build-mac:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
       - name: Prepare dist
         run: mkdir -p dist
+        shell: bash
 
       - name: Transpile
         run: |
@@ -66,6 +71,7 @@ jobs:
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
+        shell: bash
 
       - name: Build binary
         run: go build -o dist/out dist/out.go
@@ -82,13 +88,14 @@ jobs:
           path: dist/
 
 
-  # ============================
-  # WINDOWS
-  # ============================
+# ============================
+# WINDOWS JOB
+# ============================
   build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
