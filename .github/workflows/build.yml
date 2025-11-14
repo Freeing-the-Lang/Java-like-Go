@@ -24,49 +24,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      - name: Prepare dist
+      - name: Prepare dist folder
         run: mkdir -p dist
 
+      # ====== TRANSPILER ======
       - name: Run Java-like-Go transpiler
         run: |
           cd src
           go run main.go example.jgo
           cd ..
           cp src/out.go dist/out.go
-
-      - name: Build binary (Go)
         shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            go build -o dist/out.exe dist/out.go
-          else
-            go build -o dist/out dist/out.go
-          fi
 
+      # ====== BUILD BINARY ======
+      - name: Build Go binary
+        run: |
+          if ($env:RUNNER_OS -eq "Windows") {
+              go build -o dist/out.exe dist/out.go
+          } else {
+              go build -o dist/out dist/out.go
+          }
+        shell: pwsh
+
+      # ====== PROOF LEDGER ======
       - name: Create ProofLedger
-        shell: bash
         run: |
-          echo "== Java-like-Go Build Proof ==" > dist/proofledger.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
-          echo "OS: $RUNNER_OS" >> dist/proofledger.txt
-          echo "Date: $(date)" >> dist/proofledger.txt
-          echo "" >> dist/proofledger.txt
-          echo "SHA-256 Checksums:" >> dist/proofledger.txt
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            certutil -hashfile dist\\out.exe SHA256 >> dist/proofledger.txt
-          else
-            shasum -a 256 dist/out >> dist/proofledger.txt
-          fi
+          if ($env:RUNNER_OS -eq "Windows") {
+              "== Java-like-Go Build Proof ==" | Out-File -FilePath dist/proofledger.txt
+              "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger.txt
+              "OS: Windows" | Out-File -Append dist/proofledger.txt
+              certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger.txt
+          } else {
+              echo "== Java-like-Go Build Proof ==" > dist/proofledger.txt
+              echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
+              echo "OS: $RUNNER_OS" >> dist/proofledger.txt
+              shasum -a 256 dist/out >> dist/proofledger.txt
+          }
+        shell: pwsh
 
-      - name: Upload Artifacts
+      # ====== ARTIFACT ======
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Java-like-Go-${{ matrix.os }}
