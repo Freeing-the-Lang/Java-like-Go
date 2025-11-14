@@ -22,6 +22,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
+
       # ============================
       # CHECKOUT
       # ============================
@@ -37,15 +38,23 @@ jobs:
           go-version: "1.22"
 
       # ============================
-      # DIST FOLDER (CROSS OS)
+      # DIST FOLDER — POSIX
       # ============================
-      - name: Prepare dist
-        run: |
-          mkdir dist -ea 0
+      - name: Prepare dist (POSIX)
+        if: runner.os != 'Windows'
+        run: mkdir -p dist
+        shell: bash
+
+      # ============================
+      # DIST FOLDER — WINDOWS
+      # ============================
+      - name: Prepare dist (Windows)
+        if: runner.os == 'Windows'
+        run: mkdir dist -ea 0
         shell: pwsh
 
       # ============================
-      # TRANSPILER (LINUX + MAC)
+      # TRANSPILER — POSIX
       # ============================
       - name: Run Java-like-Go transpiler (POSIX)
         if: runner.os != 'Windows'
@@ -57,7 +66,7 @@ jobs:
         shell: bash
 
       # ============================
-      # TRANSPILER (WINDOWS)
+      # TRANSPILER — WINDOWS
       # ============================
       - name: Run Java-like-Go transpiler (Windows)
         if: runner.os == 'Windows'
