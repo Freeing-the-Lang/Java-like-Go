@@ -1,9 +1,9 @@
-name: "Java-like-Go — 3OS Build + ProofLedger + Auto Release"
+name: "Java-like-Go — AutoTag + 3OS Build + ProofLedger + Auto Release"
 
 on:
   push:
-    tags: [ "v*" ]    # 태그 푸시 시에만 릴리즈 실행
-  workflow_dispatch:   # 수동 실행 가능
+    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,12 +11,35 @@ permissions:
 jobs:
 
   # ============================
+  # AUTO TAG
+  # ============================
+  auto-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Auto Tag
+        id: tag
+        run: |
+          ts=$(date +'%Y%m%d-%H%M%S')
+          echo "tag=autobuild-$ts" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
+
+
+  # ============================
   # LINUX
   # ============================
   build-linux:
     runs-on: ubuntu-latest
-    outputs:
-      outdir: ${{ steps.upload.outputs.artifact }}
+    needs: auto-tag
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -30,16 +53,15 @@ jobs:
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-          go build -o dist/out-linux-${{ github.ref_name }} dist/out.go
+          go build -o dist/out-linux-${{ needs.auto-tag.outputs.new_tag }} dist/out.go
 
       - name: ProofLedger (Linux)
         run: |
-          echo "== Linux Build ==" > dist/proofledger-linux-${{ github.ref_name }}.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger-linux-${{ github.ref_name }}.txt
-          shasum -a 256 dist/out-linux-${{ github.ref_name }} >> dist/proofledger-linux-${{ github.ref_name }}.txt
+          echo "== Linux Build ==" > dist/proofledger-linux-${{ needs.auto-tag.outputs.new_tag }}.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger-linux-${{ needs.auto-tag.outputs.new_tag }}.txt
+          shasum -a 256 dist/out-linux-${{ needs.auto-tag.outputs.new_tag }} >> dist/proofledger-linux-${{ needs.auto-tag.outputs.new_tag }}.txt
 
-      - id: upload
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: linux
           path: dist/
@@ -50,8 +72,7 @@ jobs:
   # ============================
   build-mac:
     runs-on: macos-latest
-    outputs:
-      outdir: ${{ steps.upload.outputs.artifact }}
+    needs: auto-tag
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -65,16 +86,15 @@ jobs:
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-          go build -o dist/out-macos-${{ github.ref_name }} dist/out.go
+          go build -o dist/out-macos-${{ needs.auto-tag.outputs.new_tag }} dist/out.go
 
       - name: ProofLedger (macOS)
         run: |
-          echo "== macOS Build ==" > dist/proofledger-macos-${{ github.ref_name }}.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger-macos-${{ github.ref_name }}.txt
-          shasum -a 256 dist/out-macos-${{ github.ref_name }} >> dist/proofledger-macos-${{ github.ref_name }}.txt
+          echo "== macOS Build ==" > dist/proofledger-macos-${{ needs.auto-tag.outputs.new_tag }}.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger-macos-${{ needs.auto-tag.outputs.new_tag }}.txt
+          shasum -a 256 dist/out-macos-${{ needs.auto-tag.outputs.new_tag }} >> dist/proofledger-macos-${{ needs.auto-tag.outputs.new_tag }}.txt
 
-      - id: upload
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: dist/
@@ -85,8 +105,7 @@ jobs:
   # ============================
   build-windows:
     runs-on: windows-latest
-    outputs:
-      outdir: ${{ steps.upload.outputs.artifact }}
+    needs: auto-tag
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -101,30 +120,27 @@ jobs:
           go run . ../example.jgo
           cd ..
           Copy-Item src\out.go dist\out.go
-          go build -o dist/out-windows-${{ github.ref_name }}.exe dist/out.go
+          go build -o dist/out-windows-${{ needs.auto-tag.outputs.new_tag }}.exe dist/out.go
 
       - name: ProofLedger (Windows)
         shell: pwsh
         run: |
-          "== Windows Build ==" | Out-File dist/proofledger-windows-${{ github.ref_name }}.txt
-          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger-windows-${{ github.ref_name }}.txt
-          certutil -hashfile dist/out-windows-${{ github.ref_name }}.exe SHA256 | Out-File -Append dist/proofledger-windows-${{ github.ref_name }}.txt
+          "== Windows Build ==" | Out-File dist/proofledger-windows-${{ needs.auto-tag.outputs.new_tag }}.txt
+          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger-windows-${{ needs.auto-tag.outputs.new_tag }}.txt
+          certutil -hashfile dist/out-windows-${{ needs.auto-tag.outputs.new_tag }}.exe SHA256 | Out-File -Append dist/proofledger-windows-${{ needs.auto-tag.outputs.new_tag }}.txt
 
-      - id: upload
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: dist/
 
 
   # ============================
-  # RELEASE (TAG 전용)
+  # RELEASE
   # ============================
   release:
-    needs: [build-linux, build-mac, build-windows]
+    needs: [auto-tag, build-linux, build-mac, build-windows]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')  # 🔥 핵심: 태그일 때만 실행
-
     steps:
       - uses: actions/checkout@v4
 
@@ -146,8 +162,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "Java-like-Go Release ${{ github.ref_name }}"
+          tag_name: ${{ needs.auto-tag.outputs.new_tag }}
+          name: "Java-like-Go Auto Release — ${{ needs.auto-tag.outputs.new_tag }}"
           draft: false
           prerelease: false
           files: |
