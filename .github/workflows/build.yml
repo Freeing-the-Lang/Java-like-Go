@@ -1,4 +1,4 @@
-name: "Java-like-Go — AutoTag + 3OS Build + ProofLedger + Auto Release"
+name: "Java-like-Go — AutoTag + 3OS Build + ProofLedger + ZIP Release"
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 jobs:
 
   # ============================
-  # AUTO TAG
+  # AUTO TAG GENERATION
   # ============================
   auto-tag:
     runs-on: ubuntu-latest
@@ -42,6 +42,7 @@ jobs:
     needs: auto-tag
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
@@ -61,10 +62,19 @@ jobs:
           echo "Commit: $GITHUB_SHA" >> dist/proofledger-linux-${{ needs.auto-tag.outputs.new_tag }}.txt
           shasum -a 256 dist/out-linux-${{ needs.auto-tag.outputs.new_tag }} >> dist/proofledger-linux-${{ needs.auto-tag.outputs.new_tag }}.txt
 
+      - name: Create Linux ZIP
+        run: |
+          cd dist
+          zip -r java-like-go-linux-${{ needs.auto-tag.outputs.new_tag }}.zip \
+            out-linux-${{ needs.auto-tag.outputs.new_tag }} \
+            out.go \
+            proofledger-linux-${{ needs.auto-tag.outputs.new_tag }}.txt
+          cd ..
+
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
-          path: dist/
+          name: linux-zip
+          path: dist/*.zip
 
 
   # ============================
@@ -75,6 +85,7 @@ jobs:
     needs: auto-tag
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
@@ -94,10 +105,19 @@ jobs:
           echo "Commit: $GITHUB_SHA" >> dist/proofledger-macos-${{ needs.auto-tag.outputs.new_tag }}.txt
           shasum -a 256 dist/out-macos-${{ needs.auto-tag.outputs.new_tag }} >> dist/proofledger-macos-${{ needs.auto-tag.outputs.new_tag }}.txt
 
+      - name: Create macOS ZIP
+        run: |
+          cd dist
+          zip -r java-like-go-macos-${{ needs.auto-tag.outputs.new_tag }}.zip \
+            out-macos-${{ needs.auto-tag.outputs.new_tag }} \
+            out.go \
+            proofledger-macos-${{ needs.auto-tag.outputs.new_tag }}.txt
+          cd ..
+
       - uses: actions/upload-artifact@v4
         with:
-          name: macos
-          path: dist/
+          name: macos-zip
+          path: dist/*.zip
 
 
   # ============================
@@ -108,6 +128,7 @@ jobs:
     needs: auto-tag
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
@@ -129,37 +150,49 @@ jobs:
           "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger-windows-${{ needs.auto-tag.outputs.new_tag }}.txt
           certutil -hashfile dist/out-windows-${{ needs.auto-tag.outputs.new_tag }}.exe SHA256 | Out-File -Append dist/proofledger-windows-${{ needs.auto-tag.outputs.new_tag }}.txt
 
+      - name: Create Windows ZIP
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path `
+            out-windows-${{ needs.auto-tag.outputs.new_tag }}.exe, `
+            out.go, `
+            proofledger-windows-${{ needs.auto-tag.outputs.new_tag }}.txt `
+            -DestinationPath java-like-go-windows-${{ needs.auto-tag.outputs.new_tag }}.zip
+          cd ..
+
       - uses: actions/upload-artifact@v4
         with:
-          name: windows
-          path: dist/
+          name: windows-zip
+          path: dist/*.zip
 
 
   # ============================
-  # RELEASE
+  # FINAL RELEASE
   # ============================
   release:
     needs: [auto-tag, build-linux, build-mac, build-windows]
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          name: linux
+          name: linux-zip
           path: dist/linux
 
       - uses: actions/download-artifact@v4
         with:
-          name: macos
+          name: macos-zip
           path: dist/macos
 
       - uses: actions/download-artifact@v4
         with:
-          name: windows
+          name: windows-zip
           path: dist/windows
 
-      - name: Create Release
+      - name: Create Release ZIP Upload
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.auto-tag.outputs.new_tag }}
@@ -167,6 +200,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            dist/linux/*
-            dist/macos/*
-            dist/windows/*
+            dist/linux/*.zip
+            dist/macos/*.zip
+            dist/windows/*.zip
