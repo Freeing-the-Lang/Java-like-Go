@@ -2,8 +2,8 @@ name: "Java-like-Go — 3OS Build + ProofLedger + Auto Release"
 
 on:
   push:
-    tags: [ "v*" ]     # 태그 푸시 시 자동 릴리즈
-  workflow_dispatch:    # 수동 실행 가능
+    tags: [ "v*" ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,8 +15,6 @@ jobs:
   # ============================
   build-linux:
     runs-on: ubuntu-latest
-    outputs:
-      artifact: ${{ steps.upload.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -30,17 +28,15 @@ jobs:
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-          go build -o dist/out dist/out.go
+          go build -o dist/out-linux-${{ github.ref_name }} dist/out.go
 
       - name: ProofLedger (Linux)
         run: |
-          echo "== Linux Build ==" > dist/proofledger-linux.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger-linux.txt
-          shasum -a 256 dist/out >> dist/proofledger-linux.txt
+          echo "== Linux Build ==" > dist/proofledger-linux-${{ github.ref_name }}.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger-linux-${{ github.ref_name }}.txt
+          shasum -a 256 dist/out-linux-${{ github.ref_name }} >> dist/proofledger-linux-${{ github.ref_name }}.txt
 
-      - name: Upload Linux Artifact
-        id: upload
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: linux
           path: dist/
@@ -51,8 +47,6 @@ jobs:
   # ============================
   build-mac:
     runs-on: macos-latest
-    outputs:
-      artifact: ${{ steps.upload.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -66,17 +60,15 @@ jobs:
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-          go build -o dist/out dist/out.go
+          go build -o dist/out-macos-${{ github.ref_name }} dist/out.go
 
       - name: ProofLedger (macOS)
         run: |
-          echo "== macOS Build ==" > dist/proofledger-macos.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger-macos.txt
-          shasum -a 256 dist/out >> dist/proofledger-macos.txt
+          echo "== macOS Build ==" > dist/proofledger-macos-${{ github.ref_name }}.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger-macos-${{ github.ref_name }}.txt
+          shasum -a 256 dist/out-macos-${{ github.ref_name }} >> dist/proofledger-macos-${{ github.ref_name }}.txt
 
-      - name: Upload macOS Artifact
-        id: upload
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: dist/
@@ -87,8 +79,6 @@ jobs:
   # ============================
   build-windows:
     runs-on: windows-latest
-    outputs:
-      artifact: ${{ steps.upload.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -103,25 +93,23 @@ jobs:
           go run . ../example.jgo
           cd ..
           Copy-Item src\out.go dist\out.go
-          go build -o dist/out.exe dist/out.go
+          go build -o dist/out-windows-${{ github.ref_name }}.exe dist/out.go
 
       - name: ProofLedger (Windows)
         shell: pwsh
         run: |
-          "== Windows Build ==" | Out-File dist/proofledger-windows.txt
-          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger-windows.txt
-          certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger-windows.txt
+          "== Windows Build ==" | Out-File dist/proofledger-windows-${{ github.ref_name }}.txt
+          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger-windows-${{ github.ref_name }}.txt
+          certutil -hashfile dist/out-windows-${{ github.ref_name }}.exe SHA256 | Out-File -Append dist/proofledger-windows-${{ github.ref_name }}.txt
 
-      - name: Upload Windows Artifact
-        id: upload
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: dist/
 
 
   # ============================
-  # RELEASE JOB (AFTER ALL BUILDS)
+  # RELEASE JOB
   # ============================
   release:
     needs: [build-linux, build-mac, build-windows]
@@ -130,15 +118,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: linux
           path: dist/linux
+
       - uses: actions/download-artifact@v4
         with:
           name: macos
           path: dist/macos
+
       - uses: actions/download-artifact@v4
         with:
           name: windows
