@@ -30,23 +30,23 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Prepare dist folder
+      - name: Prepare dist
         run: mkdir -p dist
         shell: bash
 
       # ============================
-      # 1) Transpile (example.jgo → out.go)
+      # 1) Transpile example.jgo → out.go
       # ============================
       - name: Run Java-like-Go transpiler
         run: |
           cd src
-          go run . example.jgo
+          go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
         shell: bash
 
       # ============================
-      # 2) Build Binary (Go → Native)
+      # 2) Build Binary
       # ============================
       - name: Build Go binary
         run: |
@@ -58,7 +58,7 @@ jobs:
         shell: pwsh
 
       # ============================
-      # 3) ProofLedger generation
+      # 3) ProofLedger
       # ============================
       - name: Create ProofLedger
         run: |
@@ -80,7 +80,7 @@ jobs:
         shell: pwsh
 
       # ============================
-      # 4) Upload Artifact per OS
+      # 4) Artifact Upload
       # ============================
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
