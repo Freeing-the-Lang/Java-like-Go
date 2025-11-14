@@ -32,17 +32,22 @@ jobs:
 
       - name: Prepare dist folder
         run: mkdir -p dist
+        shell: bash
 
-      # ====== TRANSPILER ======
+      # ============================
+      # 1) Transpile (example.jgo → out.go)
+      # ============================
       - name: Run Java-like-Go transpiler
         run: |
           cd src
-          go run main.go example.jgo
+          go run . example.jgo
           cd ..
           cp src/out.go dist/out.go
         shell: bash
 
-      # ====== BUILD BINARY ======
+      # ============================
+      # 2) Build Binary (Go → Native)
+      # ============================
       - name: Build Go binary
         run: |
           if ($env:RUNNER_OS -eq "Windows") {
@@ -52,23 +57,31 @@ jobs:
           }
         shell: pwsh
 
-      # ====== PROOF LEDGER ======
+      # ============================
+      # 3) ProofLedger generation
+      # ============================
       - name: Create ProofLedger
         run: |
           if ($env:RUNNER_OS -eq "Windows") {
               "== Java-like-Go Build Proof ==" | Out-File -FilePath dist/proofledger.txt
               "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger.txt
               "OS: Windows" | Out-File -Append dist/proofledger.txt
+              "" | Out-File -Append dist/proofledger.txt
+              "SHA-256 Checksums:" | Out-File -Append dist/proofledger.txt
               certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger.txt
           } else {
               echo "== Java-like-Go Build Proof ==" > dist/proofledger.txt
               echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
               echo "OS: $RUNNER_OS" >> dist/proofledger.txt
+              echo "" >> dist/proofledger.txt
+              echo "SHA-256 Checksums:" >> dist/proofledger.txt
               shasum -a 256 dist/out >> dist/proofledger.txt
           }
         shell: pwsh
 
-      # ====== ARTIFACT ======
+      # ============================
+      # 4) Upload Artifact per OS
+      # ============================
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
