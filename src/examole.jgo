@@ -1,5 +1,0 @@
-class Main {
-    public static void main() {
-        print("Hello from Java-like-Go!");
-    }
-}
