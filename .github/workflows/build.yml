@@ -22,22 +22,33 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
+      # ============================
+      # CHECKOUT
+      # ============================
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ============================
+      # GO INSTALL
+      # ============================
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
+      # ============================
+      # DIST FOLDER (CROSS OS)
+      # ============================
       - name: Prepare dist
-        run: mkdir -p dist
-        shell: bash
+        run: |
+          mkdir dist -ea 0
+        shell: pwsh
 
       # ============================
-      # 1) Transpile example.jgo → out.go
+      # TRANSPILER (LINUX + MAC)
       # ============================
-      - name: Run Java-like-Go transpiler
+      - name: Run Java-like-Go transpiler (POSIX)
+        if: runner.os != 'Windows'
         run: |
           cd src
           go run . ../example.jgo
@@ -46,7 +57,19 @@ jobs:
         shell: bash
 
       # ============================
-      # 2) Build Binary
+      # TRANSPILER (WINDOWS)
+      # ============================
+      - name: Run Java-like-Go transpiler (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd src
+          go run . ../example.jgo
+          cd ..
+          Copy-Item src\out.go dist\out.go
+        shell: pwsh
+
+      # ============================
+      # BUILD GO BINARY
       # ============================
       - name: Build Go binary
         run: |
@@ -58,31 +81,31 @@ jobs:
         shell: pwsh
 
       # ============================
-      # 3) ProofLedger
+      # PROOFLEDGER
       # ============================
       - name: Create ProofLedger
         run: |
           if ($env:RUNNER_OS -eq "Windows") {
-              "== Java-like-Go Build Proof ==" | Out-File -FilePath dist/proofledger.txt
+              "== Java-like-Go Build Proof ==" | Out-File dist/proofledger.txt
               "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger.txt
               "OS: Windows" | Out-File -Append dist/proofledger.txt
               "" | Out-File -Append dist/proofledger.txt
-              "SHA-256 Checksums:" | Out-File -Append dist/proofledger.txt
+              "SHA-256:" | Out-File -Append dist/proofledger.txt
               certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger.txt
           } else {
               echo "== Java-like-Go Build Proof ==" > dist/proofledger.txt
               echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
               echo "OS: $RUNNER_OS" >> dist/proofledger.txt
               echo "" >> dist/proofledger.txt
-              echo "SHA-256 Checksums:" >> dist/proofledger.txt
+              echo "SHA-256:" >> dist/proofledger.txt
               shasum -a 256 dist/out >> dist/proofledger.txt
           }
         shell: pwsh
 
       # ============================
-      # 4) Artifact Upload
+      # ARTIFACT UPLOAD
       # ============================
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Java-like-Go-${{ matrix.os }}
