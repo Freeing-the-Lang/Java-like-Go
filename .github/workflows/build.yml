@@ -1,4 +1,4 @@
-name: "Java-like-Go — 3OS Build + ProofLedger"
+name: "Java-like-Go — Stable 3OS Build + ProofLedger"
 
 on:
   push:
@@ -8,114 +8,115 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: java-like-go-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-3os:
-    name: "Build — ${{ matrix.os }}"
-    runs-on: ${{ matrix.os }}
 
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
+  # ============================
+  # LINUX
+  # ============================
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
-
-      # ============================
-      # CHECKOUT
-      # ============================
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # ============================
-      # GO INSTALL
-      # ============================
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      # ============================
-      # DIST FOLDER — POSIX
-      # ============================
-      - name: Prepare dist (POSIX)
-        if: runner.os != 'Windows'
+      - name: Prepare dist
         run: mkdir -p dist
-        shell: bash
 
-      # ============================
-      # DIST FOLDER — WINDOWS
-      # ============================
-      - name: Prepare dist (Windows)
-        if: runner.os == 'Windows'
-        run: mkdir dist -ea 0
-        shell: pwsh
-
-      # ============================
-      # TRANSPILER — POSIX
-      # ============================
-      - name: Run Java-like-Go transpiler (POSIX)
-        if: runner.os != 'Windows'
+      - name: Transpile
         run: |
           cd src
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-        shell: bash
 
-      # ============================
-      # TRANSPILER — WINDOWS
-      # ============================
-      - name: Run Java-like-Go transpiler (Windows)
-        if: runner.os == 'Windows'
+      - name: Build binary
+        run: go build -o dist/out dist/out.go
+
+      - name: ProofLedger
+        run: |
+          echo "== Linux Build ==" > dist/proofledger.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
+          shasum -a 256 dist/out >> dist/proofledger.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Java-like-Go-linux
+          path: dist/
+
+
+  # ============================
+  # MAC
+  # ============================
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Prepare dist
+        run: mkdir -p dist
+
+      - name: Transpile
+        run: |
+          cd src
+          go run . ../example.jgo
+          cd ..
+          cp src/out.go dist/out.go
+
+      - name: Build binary
+        run: go build -o dist/out dist/out.go
+
+      - name: ProofLedger
+        run: |
+          echo "== macOS Build ==" > dist/proofledger.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
+          shasum -a 256 dist/out >> dist/proofledger.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Java-like-Go-macos
+          path: dist/
+
+
+  # ============================
+  # WINDOWS
+  # ============================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Prepare dist
+        shell: pwsh
+        run: mkdir dist -ea 0
+
+      - name: Transpile
+        shell: pwsh
         run: |
           cd src
           go run . ../example.jgo
           cd ..
           Copy-Item src\out.go dist\out.go
-        shell: pwsh
 
-      # ============================
-      # BUILD GO BINARY
-      # ============================
-      - name: Build Go binary
+      - name: Build binary
+        shell: pwsh
+        run: go build -o dist/out.exe dist/out.go
+
+      - name: ProofLedger
+        shell: pwsh
         run: |
-          if ($env:RUNNER_OS -eq "Windows") {
-              go build -o dist/out.exe dist/out.go
-          } else {
-              go build -o dist/out dist/out.go
-          }
-        shell: pwsh
+          "== Windows Build ==" | Out-File dist/proofledger.txt
+          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger.txt
+          certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger.txt
 
-      # ============================
-      # PROOFLEDGER
-      # ============================
-      - name: Create ProofLedger
-        run: |
-          if ($env:RUNNER_OS -eq "Windows") {
-              "== Java-like-Go Build Proof ==" | Out-File dist/proofledger.txt
-              "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger.txt
-              "OS: Windows" | Out-File -Append dist/proofledger.txt
-              "" | Out-File -Append dist/proofledger.txt
-              "SHA-256:" | Out-File -Append dist/proofledger.txt
-              certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger.txt
-          } else {
-              echo "== Java-like-Go Build Proof ==" > dist/proofledger.txt
-              echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
-              echo "OS: $RUNNER_OS" >> dist/proofledger.txt
-              echo "" >> dist/proofledger.txt
-              echo "SHA-256:" >> dist/proofledger.txt
-              shasum -a 256 dist/out >> dist/proofledger.txt
-          }
-        shell: pwsh
-
-      # ============================
-      # ARTIFACT UPLOAD
-      # ============================
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: Java-like-Go-${{ matrix.os }}
+          name: Java-like-Go-windows
           path: dist/
