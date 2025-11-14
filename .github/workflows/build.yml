@@ -1,129 +1,157 @@
-name: "Java-like-Go — 3OS Stable Build + ProofLedger"
+name: "Java-like-Go — 3OS Build + ProofLedger + Auto Release"
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    tags: [ "v*" ]     # 태그 푸시 시 자동 릴리즈
+  workflow_dispatch:    # 수동 실행 가능
 
 permissions:
   contents: write
 
-
-# ============================
-# LINUX JOB
-# ============================
 jobs:
+
+  # ============================
+  # LINUX
+  # ============================
   build-linux:
     runs-on: ubuntu-latest
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      - name: Prepare dist
-        run: mkdir -p dist
-        shell: bash
-
-      - name: Transpile
+      - name: Build Linux Binary
         run: |
+          mkdir -p dist
           cd src
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-        shell: bash
+          go build -o dist/out dist/out.go
 
-      - name: Build binary
-        run: go build -o dist/out dist/out.go
-
-      - name: ProofLedger
+      - name: ProofLedger (Linux)
         run: |
-          echo "== Linux Build ==" > dist/proofledger.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
-          shasum -a 256 dist/out >> dist/proofledger.txt
+          echo "== Linux Build ==" > dist/proofledger-linux.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger-linux.txt
+          shasum -a 256 dist/out >> dist/proofledger-linux.txt
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Linux Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
         with:
-          name: Java-like-Go-linux
+          name: linux
           path: dist/
 
 
-# ============================
-# MACOS JOB
-# ============================
+  # ============================
+  # MACOS
+  # ============================
   build-mac:
     runs-on: macos-latest
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      - name: Prepare dist
-        run: mkdir -p dist
-        shell: bash
-
-      - name: Transpile
+      - name: Build macOS Binary
         run: |
+          mkdir -p dist
           cd src
           go run . ../example.jgo
           cd ..
           cp src/out.go dist/out.go
-        shell: bash
+          go build -o dist/out dist/out.go
 
-      - name: Build binary
-        run: go build -o dist/out dist/out.go
-
-      - name: ProofLedger
+      - name: ProofLedger (macOS)
         run: |
-          echo "== macOS Build ==" > dist/proofledger.txt
-          echo "Commit: $GITHUB_SHA" >> dist/proofledger.txt
-          shasum -a 256 dist/out >> dist/proofledger.txt
+          echo "== macOS Build ==" > dist/proofledger-macos.txt
+          echo "Commit: $GITHUB_SHA" >> dist/proofledger-macos.txt
+          shasum -a 256 dist/out >> dist/proofledger-macos.txt
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload macOS Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
         with:
-          name: Java-like-Go-macos
+          name: macos
           path: dist/
 
 
-# ============================
-# WINDOWS JOB
-# ============================
+  # ============================
+  # WINDOWS
+  # ============================
   build-windows:
     runs-on: windows-latest
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      - name: Prepare dist
-        shell: pwsh
-        run: mkdir dist -ea 0
-
-      - name: Transpile
+      - name: Build Windows Binary
         shell: pwsh
         run: |
+          mkdir dist -ea 0
           cd src
           go run . ../example.jgo
           cd ..
           Copy-Item src\out.go dist\out.go
+          go build -o dist/out.exe dist/out.go
 
-      - name: Build binary
-        shell: pwsh
-        run: go build -o dist/out.exe dist/out.go
-
-      - name: ProofLedger
+      - name: ProofLedger (Windows)
         shell: pwsh
         run: |
-          "== Windows Build ==" | Out-File dist/proofledger.txt
-          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger.txt
-          certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger.txt
+          "== Windows Build ==" | Out-File dist/proofledger-windows.txt
+          "Commit: $env:GITHUB_SHA" | Out-File -Append dist/proofledger-windows.txt
+          certutil -hashfile dist/out.exe SHA256 | Out-File -Append dist/proofledger-windows.txt
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Windows Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
         with:
-          name: Java-like-Go-windows
+          name: windows
           path: dist/
+
+
+  # ============================
+  # RELEASE JOB (AFTER ALL BUILDS)
+  # ============================
+  release:
+    needs: [build-linux, build-mac, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: dist/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos
+          path: dist/macos
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: dist/windows
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Java-like-Go Release ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          files: |
+            dist/linux/*
+            dist/macos/*
+            dist/windows/*
